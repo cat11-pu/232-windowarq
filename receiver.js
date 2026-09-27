@@ -1,7 +1,74 @@
-// receiver.js：接收窗口状态机（基线：一律给零）
+// receiver.js：接收窗口状态机，一次扫描给出交付 / 迟交付 / 重复 / 越窗判定
 import { inWindow } from "./window.js";
 
+function badWindow() {
+  const error = new Error("window must be a positive integer");
+  error.code = "E_BAD_WINDOW";
+  return error;
+}
+
+function badFrame(position) {
+  const error = new Error("frame at position " + position + " must be a non-negative integer");
+  error.code = "E_BAD_FRAME";
+  return error;
+}
+
 export function runReceiver(spec) {
-  return { delivered: 0, late: 0, duplicates: 0, rejected: 0, rejected_positions: [],
-           expected_end: 0, backlog: [], conserved: true };
+  const size = spec ? spec.window : undefined;
+  if (!Number.isInteger(size) || size <= 0) {
+    throw badWindow();
+  }
+  const frames = (spec && spec.frames) || [];
+
+  let expected = 0;
+  let delivered = 0;
+  let late = 0;
+  let duplicates = 0;
+  let rejected = 0;
+  const rejected_positions = [];
+  const backlog = new Set();
+
+  for (let spot = 0; spot < frames.length; spot++) {
+    const seq = frames[spot];
+    if (!Number.isInteger(seq) || seq < 0) {
+      throw badFrame(spot + 1);
+    }
+
+    if (seq < expected) {
+      duplicates += 1;
+    } else if (seq === expected) {
+      delivered += 1;
+      expected += 1;
+      while (backlog.has(expected)) {
+        backlog.delete(expected);
+        delivered += 1;
+        late += 1;
+        expected += 1;
+      }
+    } else if (inWindow(seq, expected, size)) {
+      if (backlog.has(seq)) {
+        duplicates += 1;
+      } else {
+        backlog.add(seq);
+      }
+    } else {
+      rejected += 1;
+      rejected_positions.push(spot + 1);
+    }
+  }
+
+  const ordered = [...backlog].sort((a, b) => a - b);
+  const countOk = delivered + ordered.length + duplicates + rejected === frames.length;
+  const windowOk = ordered.every((seq) => inWindow(seq, expected, size));
+
+  return {
+    delivered,
+    late,
+    duplicates,
+    rejected,
+    rejected_positions,
+    expected_end: expected,
+    backlog: ordered,
+    conserved: countOk && windowOk
+  };
 }

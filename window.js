@@ -1,4 +1,4 @@
-// window.js：判断帧是否落在窗口内（基线：一律给真）
+// window.js：判断帧序号是否落在接收窗口 [expected, expected + size) 内
 export function inWindow(seq, expected, size) {
-  return true;
+  return seq >= expected && seq < expected + size;
 }
