@@ -1,0 +1,6 @@
+{
+  "window_error_code": "E_BAD_WINDOW",
+  "frame_error_code": "E_BAD_FRAME",
+  "window": 3,
+  "frames": [0, 2, 1, 4, 3, 7, 5, 9, 3]
+}
